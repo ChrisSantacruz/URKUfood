@@ -52,7 +52,7 @@ services:
       - key: WHATSAPP_FROM
         value: La Carta Bot
       - key: WHATSAPP_SESSION_DIR
-        value: .wwebjs_auth
+        value: /tmp/urkufood-wwebjs-session
       - key: WHATSAPP_CHROME_PATH
         sync: false
       - key: WHATSAPP_NOTIFY_TO

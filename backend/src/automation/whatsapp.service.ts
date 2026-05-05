@@ -7,6 +7,15 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import {
+  accessSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join } from 'node:path';
 import { Client, LocalAuth, Poll, type Message } from 'whatsapp-web.js';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import {
@@ -38,6 +47,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     | 'error' = 'idle';
   private lastError: string | null = null;
   private isStarting = false;
+  private resolvedWhatsappSessionDir: string | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -426,10 +436,65 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     return this.envTruthy(this.configService.get<string>('WHATSAPP_ENABLED'));
   }
 
-  private get sessionDirectory() {
-    return (
-      this.configService.get<string>('WHATSAPP_SESSION_DIR') || './session'
+  /**
+   * LocalAuth crea subcarpetas (p. ej. session-urkufood). Comprobar W_OK en el padre
+   * no basta: en Docker a veces el padre parece ok y falla mkdir hija → probamos una subcarpeta.
+   */
+  private trySessionDataPath(dir: string): string | null {
+    try {
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      accessSync(dir, constants.W_OK);
+      const probe = join(dir, `.urku-wprobe-${Date.now()}`);
+      mkdirSync(probe, { recursive: true });
+      rmSync(probe, { recursive: true, force: true });
+      return dir;
+    } catch {
+      return null;
+    }
+  }
+
+  private get sessionDirectory(): string {
+    if (this.resolvedWhatsappSessionDir) {
+      return this.resolvedWhatsappSessionDir;
+    }
+
+    const raw =
+      this.configService.get<string>('WHATSAPP_SESSION_DIR')?.trim() ||
+      './session';
+    const fromConfig = isAbsolute(raw)
+      ? raw
+      : join(process.cwd(), raw);
+
+    const tmpSession = join(tmpdir(), 'urkufood-wwebjs-session');
+    const deployLike =
+      this.isRenderEnvironment || process.cwd() === '/usr/src/app';
+
+    // En Render/Docker: no priorizar .wwebjs_auth bajo /usr/src/app (EACCES al crear session-*).
+    const ordered = deployLike
+      ? ['/data/session', tmpSession, fromConfig]
+      : [fromConfig, '/data/session', tmpSession];
+
+    for (const dir of ordered) {
+      const ok = this.trySessionDataPath(dir);
+      if (ok) {
+        this.resolvedWhatsappSessionDir = ok;
+        if (ok !== fromConfig) {
+          this.logger.warn(
+            `WHATSAPP_SESSION_DIR efectivo: ${ok} (en env: ${raw})`,
+          );
+        }
+        return ok;
+      }
+    }
+
+    mkdirSync(tmpSession, { recursive: true });
+    this.resolvedWhatsappSessionDir = tmpSession;
+    this.logger.error(
+      `No se pudo preparar ruta de sesión WA; usando ${tmpSession}`,
     );
+    return tmpSession;
   }
 
   private async handleQr(qr: string) {

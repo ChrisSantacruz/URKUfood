@@ -59,9 +59,9 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_CACHE_DIR=/usr/src/app/.cache/puppeteer
 RUN set -eux; \
-  mkdir -p /data/session /usr/src/app/uploads /usr/src/app/.cache/puppeteer; \
-  chown -R node:node /data/session /usr/src/app/uploads /usr/src/app/.cache; \
-  chmod -R 0755 /usr/src/app/uploads /usr/src/app/.cache || true
+  mkdir -p /data/session /usr/src/app/uploads /usr/src/app/.cache/puppeteer /usr/src/app/.wwebjs_auth; \
+  chown -R node:node /data/session /usr/src/app/uploads /usr/src/app/.cache /usr/src/app/.wwebjs_auth; \
+  chmod -R 0755 /usr/src/app/uploads /usr/src/app/.cache /usr/src/app/.wwebjs_auth || true
 
 EXPOSE 3000
 
