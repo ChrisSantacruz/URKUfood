@@ -567,7 +567,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (this.client && this.connectionState === 'connected') {
         return;
       }
-      if (this.connectionState === 'qr' || this.connectionState === 'disabled') {
+      // No cortar en `qr`: el usuario puede escanear durante la espera del checkout.
+      if (this.connectionState === 'disabled') {
         return;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 500));
