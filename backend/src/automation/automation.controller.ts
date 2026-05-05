@@ -156,12 +156,24 @@ function buildWhatsappQrPageHtml(publicBase: string): string {
       document.getElementById('copyUrl').onclick = function () { copy(pagePath); };
       document.getElementById('copyKeep').onclick = function () { copy(keepPath); };
     })();
+    var apiBase = '/automation/whatsapp';
     async function loadStatus() {
-      const r = await fetch('status', { cache: 'no-store' });
+      var r = await fetch(apiBase + '/status', {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      });
+      var ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        var snippet = (await r.text()).slice(0, 160).replace(/\\s+/g, ' ');
+        throw new Error('El servidor devolvió HTML en lugar de JSON (' + r.status + '). Prueba sin barra final en la URL o revisa la consola. ' + snippet);
+      }
       return r.json();
     }
     async function postConnect() {
-      await fetch('connect', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      await fetch(apiBase + '/connect', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      });
     }
     function render(j) {
       var st = document.getElementById('state');
