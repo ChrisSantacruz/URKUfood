@@ -58,6 +58,8 @@ ENV WHATSAPP_CHROME_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_CACHE_DIR=/usr/src/app/.cache/puppeteer
+# Deja RAM para Chromium en hosts de ~512MB (Render free). Ajusta en panel si OOM persiste.
+ENV NODE_OPTIONS=--max-old-space-size=160
 RUN set -eux; \
   mkdir -p /data/session /usr/src/app/uploads /usr/src/app/.cache/puppeteer /usr/src/app/.wwebjs_auth; \
   chown -R node:node /data/session /usr/src/app/uploads /usr/src/app/.cache /usr/src/app/.wwebjs_auth; \

@@ -98,10 +98,21 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
           headless: true,
           executablePath:
             this.configService.get<string>('WHATSAPP_CHROME_PATH') || undefined,
+          // Chrome + Nest en Render free (~512MB): flags para bajar RAM (no garantiza el límite).
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--mute-audio',
+            '--no-first-run',
+            '--font-render-hinting=none',
           ],
         },
       });
