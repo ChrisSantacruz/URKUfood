@@ -41,7 +41,10 @@ export class AutomationController {
       .get<string>('WHATSAPP_QR_PAGE_TOKEN')
       ?.trim();
     if (expected && token !== expected) {
-      res.status(401).type('text/plain').send('No autorizado');
+      res
+        .status(401)
+        .type('text/html; charset=utf-8')
+        .send(buildQrPageUnauthorizedHtml());
       return;
     }
     const publicBase =
@@ -69,6 +72,30 @@ export class AutomationController {
 
     return this.whatsappService.sendTestMessage(body?.to);
   }
+}
+
+function buildQrPageUnauthorizedHtml(): string {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso al QR de WhatsApp</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+    code { background: #f0f0f0; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    a { color: #c41e2a; }
+  </style>
+</head>
+<body>
+  <h1>No autorizado</h1>
+  <p>En el servidor está configurada la variable <code>WHATSAPP_QR_PAGE_TOKEN</code>. Para ver el código QR debes abrir el enlace <strong>incluyendo el mismo secreto en la URL</strong>:</p>
+  <p><code>…/automation/whatsapp/qr-page?token=TU_SECRETO</code></p>
+  <p>El valor de <code>token</code> tiene que coincidir exactamente con el que definiste en Render (Environment).</p>
+  <p><strong>Atajo</strong> <code>/automation/whatsapp</code> no añade el token: usa la URL completa con <code>?token=…</code> o guarda esa URL en favoritos.</p>
+  <p>Si quieres que la página sea pública (cualquiera con el enlace), en Render <strong>elimina</strong> la variable <code>WHATSAPP_QR_PAGE_TOKEN</code> y vuelve a desplegar. Menos seguro en producción.</p>
+</body>
+</html>`;
 }
 
 function buildWhatsappQrPageHtml(publicBase: string): string {
