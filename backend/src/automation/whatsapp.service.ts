@@ -398,11 +398,33 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  private getPublicQrPageUrl(): string | null {
-    const base = this.configService
+  /**
+   * URL pública para enlaces y logs. En Render usa `RENDER_EXTERNAL_URL` si `PUBLIC_BASE_URL` sigue en localhost.
+   * También la usa la página HTML del QR.
+   */
+  resolvePublicBaseUrl(): string | null {
+    const configured = this.configService
       .get<string>('PUBLIC_BASE_URL')
       ?.trim()
       .replace(/\/$/, '');
+    const renderUrl = process.env.RENDER_EXTERNAL_URL?.trim().replace(/\/$/, '');
+
+    const looksLocal =
+      configured &&
+      (configured.includes('localhost') ||
+        configured.includes('127.0.0.1'));
+
+    if (configured && !looksLocal) {
+      return configured;
+    }
+    if (renderUrl) {
+      return renderUrl;
+    }
+    return configured || null;
+  }
+
+  private getPublicQrPageUrl(): string | null {
+    const base = this.resolvePublicBaseUrl();
     if (!base) {
       return null;
     }
@@ -410,10 +432,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   }
 
   private getPublicKeepaliveUrl(): string | null {
-    const base = this.configService
-      .get<string>('PUBLIC_BASE_URL')
-      ?.trim()
-      .replace(/\/$/, '');
+    const base = this.resolvePublicBaseUrl();
     if (!base) {
       return null;
     }

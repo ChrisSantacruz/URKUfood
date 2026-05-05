@@ -45,10 +45,10 @@ export class AutomationController {
       return;
     }
     const publicBase =
-      this.configService.get<string>('PUBLIC_BASE_URL')?.trim() ?? '';
+      this.whatsappService.resolvePublicBaseUrl()?.replace(/\/$/, '') ?? '';
     res
       .type('text/html; charset=utf-8')
-      .send(buildWhatsappQrPageHtml(publicBase.replace(/\/$/, '')));
+      .send(buildWhatsappQrPageHtml(publicBase));
   }
 
   @Post('connect')
