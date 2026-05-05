@@ -694,6 +694,7 @@ class AvailabilityCheckSession {
   bool get isPending => status == 'pending';
   bool get isReady => status == 'ready';
   bool get isBlocked => status == 'blocked';
+  bool get isWhatsAppError => status == 'whatsapp_error';
   bool get needsUserAction => status == 'action_required';
   bool get isCancelled => status == 'cancelled';
 

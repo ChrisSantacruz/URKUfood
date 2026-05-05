@@ -51,6 +51,8 @@ services:
         value: true
       - key: WHATSAPP_ALLOW_RENDER
         value: true
+      - key: WHATSAPP_PHONE_DEFAULT_CC
+        value: '57'
       - key: WHATSAPP_FROM
         value: La Carta Bot
       - key: WHATSAPP_SESSION_DIR

@@ -30,7 +30,8 @@ const _olive = Color(0xFF65743A);
 const _line = Color(0xFFE8D7C8);
 const _brandRed = Color(0xFFD90404);
 const _brandRedDark = Color(0xFF9E1111);
-const _availabilityValidationPhone = '3008468223';
+/// E.164 Colombia para WhatsApp (el backend puede anteponer 57 con WHATSAPP_PHONE_DEFAULT_CC).
+const _availabilityValidationPhone = '573008468223';
 const _pastoCenter = LatLng(1.2136, -77.2811);
 const _googleServerClientId = String.fromEnvironment(
   'GOOGLE_SERVER_CLIENT_ID',
@@ -9272,6 +9273,12 @@ class _WhatsappAvailabilitySheetContentState
   void initState() {
     super.initState();
     _session = widget.initialSession;
+    if (_session.isReady ||
+        _session.isBlocked ||
+        _session.isWhatsAppError ||
+        _session.isCancelled) {
+      return;
+    }
     _startPolling();
   }
 
@@ -9308,7 +9315,10 @@ class _WhatsappAvailabilitySheetContentState
       _session = updated;
     });
 
-    if (_session.isReady || _session.isBlocked || _session.isCancelled) {
+    if (_session.isReady ||
+        _session.isBlocked ||
+        _session.isWhatsAppError ||
+        _session.isCancelled) {
       _pollingTimer?.cancel();
     }
   }
@@ -9422,6 +9432,8 @@ class _WhatsappAvailabilitySheetContentState
                     : Icons.schedule_rounded;
                 final statusLabel = restaurant.isConfirmed
                     ? 'Confirmado'
+                    : restaurant.isError && _session.isWhatsAppError
+                    ? 'WhatsApp'
                     : restaurant.isDishUnavailable || restaurant.isError
                     ? 'Novedad'
                     : restaurant.isIngredientUnavailable
@@ -9584,7 +9596,16 @@ class _WhatsappAvailabilitySheetContentState
                 );
               }),
               const SizedBox(height: 8),
-              if (_session.isBlocked) ...[
+              if (_session.isWhatsAppError) ...[
+                Text(
+                  'El servidor no pudo enviar el WhatsApp al restaurante (revisa que esté conectado y el número en formato internacional). Cierra y vuelve a intentar el pago.',
+                  style: GoogleFonts.manrope(
+                    color: _coral,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ] else if (_session.isBlocked) ...[
                 Text(
                   'Hay una novedad en tu pedido. Revísala antes de continuar.',
                   style: GoogleFonts.manrope(
@@ -9610,6 +9631,8 @@ class _WhatsappAvailabilitySheetContentState
                         ? '$actionLabel ${_currency(widget.controller.payableTotal)}'
                         : _session.needsUserAction
                         ? 'Responde la novedad para continuar'
+                        : _session.isWhatsAppError
+                        ? 'Cierra y reintenta'
                         : _session.isBlocked
                         ? 'Pedido con novedades'
                         : 'El restaurante está validando tu pedido',

@@ -97,7 +97,15 @@ export class AvailabilitySession {
 
   @Prop({
     required: true,
-    enum: ['pending', 'action_required', 'ready', 'blocked', 'cancelled', 'completed'],
+    enum: [
+      'pending',
+      'action_required',
+      'ready',
+      'blocked',
+      'whatsapp_error',
+      'cancelled',
+      'completed',
+    ],
     default: 'pending',
   })
   status!: string;

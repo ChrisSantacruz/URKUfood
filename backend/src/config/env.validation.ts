@@ -87,6 +87,11 @@ class EnvironmentVariables {
   @IsString()
   WHATSAPP_QR_PAGE_TOKEN?: string;
 
+  /** Ej. 57 — si el número no empieza por este prefijo, se antepone (pedidos/disponibilidad). */
+  @IsOptional()
+  @IsString()
+  WHATSAPP_PHONE_DEFAULT_CC?: string;
+
   @IsString()
   @IsNotEmpty()
   WHATSAPP_FROM!: string;

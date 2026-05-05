@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { StartAvailabilityDto } from './dto/start-availability.dto';
@@ -17,6 +18,7 @@ export class AvailabilityService {
     @InjectModel(AvailabilitySession.name)
     private readonly availabilitySessionModel: Model<AvailabilitySessionDocument>,
     private readonly whatsappService: WhatsappService,
+    private readonly configService: ConfigService,
   ) {}
 
   async startSession(dto: StartAvailabilityDto) {
@@ -68,16 +70,27 @@ export class AvailabilityService {
         pollName: restaurant.pollName,
       });
 
+      const errMsg =
+        typeof result === 'object' &&
+        result !== null &&
+        'error' in result &&
+        typeof (result as { error?: unknown }).error === 'string'
+          ? (result as { error: string }).error
+          : '';
       this.logger.log(
         `Availability send -> session=${session.id} restaurant=${restaurant.restaurantName} phone=${restaurant.restaurantPhone} delivered=${result.delivered}`,
       );
 
       if (!result.delivered) {
+        if (errMsg) {
+          this.logger.warn(
+            `Availability WhatsApp falló (${restaurant.restaurantName}): ${errMsg}`,
+          );
+        }
         restaurant.state = 'error';
         restaurant.flowStep = 'resolved';
         restaurant.note =
-          ('error' in result && result.error) ||
-          'No se pudo enviar la validación por WhatsApp.';
+          errMsg || 'No se pudo enviar la validación por WhatsApp.';
       }
     }
 
@@ -180,9 +193,16 @@ export class AvailabilityService {
       return;
     }
 
+    const hasSendError = session.restaurants.some(
+      (restaurant) => restaurant.state === 'error',
+    );
+    if (hasSendError) {
+      session.status = 'whatsapp_error';
+      return;
+    }
+
     const hasDishUnavailable = session.restaurants.some(
-      (restaurant) =>
-        restaurant.state === 'dish_unavailable' || restaurant.state === 'error',
+      (restaurant) => restaurant.state === 'dish_unavailable',
     );
     if (hasDishUnavailable) {
       session.status = 'blocked';
@@ -210,7 +230,19 @@ export class AvailabilityService {
   }
 
   private normalizePhone(value: string) {
-    return value.replace(/[^0-9]/g, '');
+    let digits = value.replace(/[^0-9]/g, '');
+    const cc = this.configService
+      .get<string>('WHATSAPP_PHONE_DEFAULT_CC')
+      ?.trim();
+    if (
+      cc &&
+      digits.length > 0 &&
+      !digits.startsWith(cc) &&
+      /^[1-9]\d{0,3}$/.test(cc)
+    ) {
+      digits = `${cc}${digits}`;
+    }
+    return digits;
   }
 
   private serializeSession(session: {
