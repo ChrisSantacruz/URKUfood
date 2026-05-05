@@ -481,8 +481,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (ok) {
         this.resolvedWhatsappSessionDir = ok;
         if (ok !== fromConfig) {
-          this.logger.warn(
-            `WHATSAPP_SESSION_DIR efectivo: ${ok} (en env: ${raw})`,
+          this.logger.log(
+            `Sesión WA en ${ok} (WHATSAPP_SESSION_DIR en env era "${raw}"; se usa la primera ruta escribible en Docker/Render).`,
           );
         }
         return ok;
