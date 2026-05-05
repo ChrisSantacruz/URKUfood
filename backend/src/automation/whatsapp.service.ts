@@ -188,11 +188,14 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    await this.waitForWhatsAppReady(45_000);
+
     if (!this.client || this.connectionState !== 'connected') {
       return {
         delivered: false,
         provider: 'whatsapp-web.js',
-        error: 'WhatsApp session is not connected. Scan the QR first.',
+        error:
+          'WhatsApp del servidor no listo: espera ~1 min tras iniciar Render o escanea el QR del panel. Reintenta el pedido.',
       };
     }
 
@@ -434,6 +437,27 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     }
 
     return this.envTruthy(this.configService.get<string>('WHATSAPP_ENABLED'));
+  }
+
+  /** Render cold start: Puppeteer puede tardar; esperamos antes de rechazar el envío. */
+  private async waitForWhatsAppReady(maxMs: number): Promise<void> {
+    if (!this.isEnabled()) {
+      return;
+    }
+    const deadline = Date.now() + maxMs;
+    while (Date.now() < deadline) {
+      if (this.client && this.connectionState === 'connected') {
+        return;
+      }
+      if (
+        this.connectionState === 'qr' ||
+        this.connectionState === 'error' ||
+        this.connectionState === 'disabled'
+      ) {
+        return;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   /**

@@ -948,13 +948,20 @@ class _LaCartaHomeShellState extends State<LaCartaHomeShell> {
         final radius = MediaQuery.sizeOf(context).width > 720 ? 34.0 : 0.0;
         return Stack(
           children: [
+            const Positioned.fill(
+              child: ColoredBox(color: Colors.white),
+            ),
             Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('images/backgroundapp.png'),
-                    repeat: ImageRepeat.repeat,
-                    alignment: Alignment.topCenter,
+              child: Opacity(
+                opacity: 0.18,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('images/backgroundapp.png'),
+                      repeat: ImageRepeat.repeat,
+                      alignment: Alignment.topLeft,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
                 ),
               ),
@@ -962,7 +969,7 @@ class _LaCartaHomeShellState extends State<LaCartaHomeShell> {
             DecoratedBox(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0x66FAF4EC), Color(0x66F2E7D8)],
+                  colors: [Color(0x33FAF4EC), Color(0x26FFFFFF)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
