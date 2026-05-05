@@ -393,7 +393,31 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       rawQr: this.rawQr,
       lastError: this.lastError,
       sessionDirectory: this.sessionDirectory,
+      qrPageUrl: this.getPublicQrPageUrl(),
+      keepaliveUrl: this.getPublicKeepaliveUrl(),
     };
+  }
+
+  private getPublicQrPageUrl(): string | null {
+    const base = this.configService
+      .get<string>('PUBLIC_BASE_URL')
+      ?.trim()
+      .replace(/\/$/, '');
+    if (!base) {
+      return null;
+    }
+    return `${base}/automation/whatsapp/qr-page`;
+  }
+
+  private getPublicKeepaliveUrl(): string | null {
+    const base = this.configService
+      .get<string>('PUBLIC_BASE_URL')
+      ?.trim()
+      .replace(/\/$/, '');
+    if (!base) {
+      return null;
+    }
+    return `${base}/keepalive`;
   }
 
   private normalizePhone(value: string) {
@@ -537,11 +561,16 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     this.qrCodeDataUrl = await QRCode.toDataURL(qr);
     this.connectionState = 'qr';
     this.lastError = null;
-    const terminalQr = await QRCode.toString(qr, {
-      type: 'terminal',
-      small: true,
-    });
-    this.logger.log(`Escanea este QR de WhatsApp:\n${terminalQr}`);
+    const page = this.getPublicQrPageUrl();
+    if (page) {
+      this.logger.log(
+        `QR WhatsApp listo. Abre en el navegador (no uses la consola): ${page}`,
+      );
+    } else {
+      this.logger.log(
+        'QR WhatsApp listo. Configura PUBLIC_BASE_URL para ver el enlace en logs.',
+      );
+    }
   }
 
   private async handleIncomingMessage(message: Message) {

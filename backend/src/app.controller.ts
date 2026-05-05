@@ -11,4 +11,10 @@ export class AppController {
   getHealth() {
     return this.appService.getHealth();
   }
+
+  /** Peso mínimo para UptimeRobot / cron: evita que Render free “duerma” el servicio. */
+  @Get('keepalive')
+  keepalive() {
+    return { ok: true, t: new Date().toISOString() };
+  }
 }
