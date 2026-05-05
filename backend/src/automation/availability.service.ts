@@ -62,6 +62,9 @@ export class AvailabilityService {
     this.logger.log(
       `Availability session ${session.id} created with ${session.restaurants.length} restaurant(s).`,
     );
+    this.logger.log(
+      `Availability teléfonos normalizados: ${session.restaurants.map((r) => `${r.restaurantName}=${r.restaurantPhone}`).join('; ')}`,
+    );
 
     for (const restaurant of session.restaurants) {
       const result = await this.whatsappService.sendAvailabilityRequest({

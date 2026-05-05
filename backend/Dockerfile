@@ -54,6 +54,9 @@ COPY --from=builder /usr/src/app/dist ./dist
 # Crear carpetas necesarias y establecer permisos antes de cambiar a usuario no-root
 ENV NODE_ENV=production
 ENV WHATSAPP_SESSION_DIR=/data/session
+ENV WHATSAPP_PHONE_DEFAULT_CC=57
+ENV WHATSAPP_CONNECT_DELAY_MS=8000
+ENV WHATSAPP_READY_WAIT_MS=90000
 ENV WHATSAPP_CHROME_PATH=/usr/bin/google-chrome-stable
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable

@@ -48,6 +48,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private lastError: string | null = null;
   private isStarting = false;
   private resolvedWhatsappSessionDir: string | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
 
   constructor(
     private readonly configService: ConfigService,
@@ -62,10 +64,22 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    const delayMs = this.deployWhatsAppConnectDelayMs();
+    if (delayMs > 0) {
+      this.logger.log(
+        `WhatsApp: esperando ${delayMs} ms antes de lanzar Chromium (menos choque con el arranque del API).`,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    }
+
     await this.connect();
   }
 
   async onModuleDestroy() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     await this.client?.destroy();
     this.client = null;
   }
@@ -84,12 +98,14 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     this.connectionState = 'connecting';
     this.lastError = null;
 
+    let waClient: Client | null = null;
     try {
       if (this.client) {
         await this.client.destroy();
+        this.client = null;
       }
 
-      const client = new Client({
+      waClient = new Client({
         authStrategy: new LocalAuth({
           dataPath: this.sessionDirectory,
           clientId: 'urkufood',
@@ -113,51 +129,76 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
             '--mute-audio',
             '--no-first-run',
             '--font-render-hinting=none',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--disable-site-isolation-trials',
           ],
         },
       });
 
-      client.on('qr', (qr) => {
+      waClient.on('qr', (qr) => {
         void this.handleQr(qr);
       });
-      client.on('ready', () => {
+      waClient.on('ready', () => {
+        this.reconnectAttempts = 0;
         this.connectionState = 'connected';
         this.qrCodeDataUrl = null;
         this.rawQr = null;
         this.lastError = null;
         this.logger.log('WhatsApp conectado con whatsapp-web.js');
       });
-      client.on('authenticated', () => {
+      waClient.on('authenticated', () => {
         this.connectionState = 'connecting';
         this.lastError = null;
       });
-      client.on('auth_failure', (message) => {
+      waClient.on('auth_failure', (message) => {
         this.connectionState = 'error';
         this.lastError = message;
       });
-      client.on('disconnected', (reason) => {
+      waClient.on('disconnected', (reason) => {
+        const r = String(reason);
         this.connectionState = 'idle';
-        this.lastError = String(reason);
+        this.lastError = r;
         this.client = null;
+        if (!this.isEnabled()) {
+          return;
+        }
+        if (/LOGOUT/i.test(r)) {
+          return;
+        }
+        this.scheduleReconnect(`disconnected: ${r}`, 15_000);
       });
-      client.on('message', (message) => {
+      waClient.on('message', (message) => {
         void this.handleIncomingMessage(message);
       });
-      client.on('vote_update', (vote) => {
+      waClient.on('vote_update', (vote) => {
         void this.handlePollVote(vote);
       });
 
-      await client.initialize();
+      await waClient.initialize();
 
-      this.client = client;
+      this.client = waClient;
+      waClient = null;
       return this.getStatus();
     } catch (error) {
-      this.connectionState = 'error';
-      this.lastError =
+      if (waClient) {
+        await waClient.destroy().catch(() => {});
+        waClient = null;
+      }
+      const msg =
         error instanceof Error
           ? error.message
           : 'Unknown WhatsApp startup error';
-      this.logger.error(this.lastError);
+      this.connectionState = 'error';
+      this.lastError = msg;
+      this.logger.error(msg);
+      if (
+        this.isEnabled() &&
+        (msg.includes('detached') ||
+          msg.includes('Target closed') ||
+          msg.includes('Session closed'))
+      ) {
+        this.scheduleReconnect(msg, 18_000);
+      }
       return this.getStatus();
     } finally {
       this.isStarting = false;
@@ -199,7 +240,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    await this.waitForWhatsAppReady(45_000);
+    await this.waitForWhatsAppReady(this.getReadyWaitMs());
 
     if (!this.client || this.connectionState !== 'connected') {
       return {
@@ -493,6 +534,29 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     return this.envTruthy(this.configService.get<string>('WHATSAPP_ENABLED'));
   }
 
+  /** Retraso antes del primer Chromium (Docker/Render): menos RAM concurrente con Mongo/seed. */
+  private deployWhatsAppConnectDelayMs(): number {
+    const raw =
+      this.configService.get<string>('WHATSAPP_CONNECT_DELAY_MS')?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      return parsed;
+    }
+    return this.isRenderEnvironment || process.cwd() === '/usr/src/app'
+      ? 8000
+      : 0;
+  }
+
+  private getReadyWaitMs(): number {
+    const raw =
+      this.configService.get<string>('WHATSAPP_READY_WAIT_MS')?.trim();
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 5000) {
+      return parsed;
+    }
+    return 90_000;
+  }
+
   /** Render cold start: Puppeteer puede tardar; esperamos antes de rechazar el envío. */
   private async waitForWhatsAppReady(maxMs: number): Promise<void> {
     if (!this.isEnabled()) {
@@ -503,15 +567,35 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (this.client && this.connectionState === 'connected') {
         return;
       }
-      if (
-        this.connectionState === 'qr' ||
-        this.connectionState === 'error' ||
-        this.connectionState === 'disabled'
-      ) {
+      if (this.connectionState === 'qr' || this.connectionState === 'disabled') {
         return;
       }
       await new Promise<void>((resolve) => setTimeout(resolve, 500));
     }
+  }
+
+  private scheduleReconnect(reason: string, delayMs: number): void {
+    if (!this.isEnabled()) {
+      return;
+    }
+    const max = 10;
+    if (this.reconnectAttempts >= max) {
+      this.logger.warn(
+        `WhatsApp: máximo de reconexiones automáticas (${max}). Revisa QR, RAM o sesión.`,
+      );
+      return;
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    this.reconnectAttempts += 1;
+    this.logger.warn(
+      `WhatsApp reconexión #${this.reconnectAttempts} en ${delayMs} ms — ${reason}`,
+    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.connect();
+    }, delayMs);
   }
 
   /**

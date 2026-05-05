@@ -92,6 +92,14 @@ class EnvironmentVariables {
   @IsString()
   WHATSAPP_PHONE_DEFAULT_CC?: string;
 
+  @IsOptional()
+  @IsString()
+  WHATSAPP_CONNECT_DELAY_MS?: string;
+
+  @IsOptional()
+  @IsString()
+  WHATSAPP_READY_WAIT_MS?: string;
+
   @IsString()
   @IsNotEmpty()
   WHATSAPP_FROM!: string;
